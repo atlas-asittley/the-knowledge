@@ -1,0 +1,1819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>The Knowledge</title>
+<meta name="description" content="Learn a city with no map. A navigation game built on Alzheimer's-prevention research.">
+<style>
+  :root{
+    --paper:#E7EAE4;
+    --surface:#F2F4EF;
+    --surface-2:#DDE2D9;
+    --ink:#14181A;
+    --ink-soft:#495350;
+    --ink-faint:#78827C;
+    --rule:#C9D0C7;
+    --road:#A5AFA3;
+    --road-seen:#C4CCC1;
+    --amber:#9E6008;
+    --amber-lamp:#D9902A;
+    --route:#265E64;
+    --bad:#8C3A2A;
+    --good:#2F6B45;
+    --cab:#1B1F1D;
+    --board:#DFE4DB;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#0E1210;
+      --surface:#171D19;
+      --surface-2:#202722;
+      --ink:#E5EAE3;
+      --ink-soft:#A3AEA6;
+      --ink-faint:#79837B;
+      --rule:#2B332D;
+      --road:#4B5750;
+      --road-seen:#2A322C;
+      --amber:#E6A63F;
+      --amber-lamp:#F2BE63;
+      --route:#63AFB5;
+      --bad:#D97A63;
+      --good:#6FBF8E;
+      --cab:#F2BE63;
+      --board:#1D241F;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#0E1210;
+    --surface:#171D19;
+    --surface-2:#202722;
+    --ink:#E5EAE3;
+    --ink-soft:#A3AEA6;
+    --ink-faint:#79837B;
+    --rule:#2B332D;
+    --road:#4B5750;
+    --road-seen:#2A322C;
+    --amber:#E6A63F;
+    --amber-lamp:#F2BE63;
+    --route:#63AFB5;
+    --bad:#D97A63;
+    --good:#6FBF8E;
+    --cab:#F2BE63;
+    --board:#1D241F;
+  }
+
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0;overflow:hidden}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-size:16px;
+    overscroll-behavior:none;
+    touch-action:none;
+  }
+  body.scale-lg{font-size:19px}
+
+  canvas#map{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+
+  /* ---------------- HUD ---------------- */
+  #hud{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between}
+
+  .topbar{display:flex;align-items:flex-start;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 12px 0}
+  .plate{background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:7px 11px}
+  .plate .k{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.62em;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint);
+    display:block;line-height:1.4;
+  }
+  .plate .v{font-weight:700;font-size:1em;line-height:1.25;font-variant-numeric:tabular-nums}
+  .spacer{flex:1}
+  .iconbtn{
+    pointer-events:auto;background:var(--surface);border:1px solid var(--rule);color:var(--ink);
+    border-radius:3px;width:38px;height:38px;font-size:16px;cursor:pointer;display:grid;place-items:center;font-weight:700;
+  }
+  .iconbtn:active{background:var(--surface-2)}
+
+  .fare{
+    margin:10px 12px 0;background:var(--surface);border:1px solid var(--rule);
+    border-left:3px solid var(--amber);border-radius:3px;padding:10px 13px;max-width:520px;
+  }
+  .fare .k{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.62em;letter-spacing:.13em;text-transform:uppercase;color:var(--amber);
+    font-weight:600;display:block;margin-bottom:3px;
+  }
+  .fare .target{font-size:1.22em;font-weight:700;line-height:1.2}
+  .fare .sub{font-size:.8em;color:var(--ink-soft);margin-top:3px;line-height:1.35}
+
+  #toast{
+    position:fixed;left:50%;top:32%;transform:translate(-50%,-50%);
+    background:var(--surface);border:1px solid var(--rule);border-radius:4px;
+    padding:16px 22px;text-align:center;min-width:230px;max-width:88vw;
+    box-shadow:0 8px 30px rgba(0,0,0,.18);opacity:0;transition:opacity .25s;pointer-events:none;z-index:15;
+  }
+  #toast.show{opacity:1}
+  #toast .big{font-size:1.5em;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+  #toast .small{font-size:.82em;color:var(--ink-soft);margin-top:5px;line-height:1.4}
+
+  /* peripheral-task prompt */
+  .probe{
+    margin:0 12px 10px;background:var(--surface);border:1px solid var(--amber);
+    border-radius:4px;padding:12px 14px;display:none;pointer-events:auto;
+    box-shadow:0 6px 24px rgba(0,0,0,.14);
+  }
+  .probe.open{display:block}
+  .probe .q{font-size:.95em;font-weight:700;margin-bottom:9px}
+  .probe .opts{display:flex;gap:7px;flex-wrap:wrap}
+  .probe .opts button{
+    flex:1 1 auto;min-width:74px;background:var(--surface-2);border:1px solid var(--rule);
+    border-radius:3px;color:var(--ink);font-family:inherit;font-size:.92em;font-weight:600;
+    padding:11px 8px;cursor:pointer;
+  }
+  .probe .opts button:active{background:var(--amber);border-color:var(--amber);color:var(--paper)}
+
+  .controls{display:flex;align-items:flex-end;justify-content:space-between;padding:0 14px calc(14px + env(safe-area-inset-bottom));gap:12px}
+  .dpad{pointer-events:auto;display:grid;grid-template-columns:repeat(3,54px);grid-template-rows:repeat(3,54px);gap:5px}
+  body.scale-lg .dpad{grid-template-columns:repeat(3,62px);grid-template-rows:repeat(3,62px)}
+  .dpad button{
+    background:var(--surface);border:1px solid var(--rule);border-radius:4px;color:var(--ink);
+    font-size:19px;font-weight:700;display:grid;place-items:center;cursor:pointer;user-select:none;
+  }
+  .dpad button.on{background:var(--amber);border-color:var(--amber);color:var(--paper)}
+  .dpad .u{grid-area:1/2} .dpad .l{grid-area:2/1} .dpad .r{grid-area:2/3} .dpad .d{grid-area:3/2}
+  .dpad .c{grid-area:2/2;background:transparent;border:none;cursor:default}
+
+  .legend{background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:8px 11px;font-size:.72em;color:var(--ink-soft);max-width:220px;line-height:1.5}
+  .legend b{color:var(--ink);font-weight:700}
+
+  /* ---------------- panels ---------------- */
+  .panel{
+    position:fixed;inset:0;background:var(--paper);overflow-y:auto;-webkit-overflow-scrolling:touch;
+    padding:calc(22px + env(safe-area-inset-top)) 22px calc(40px + env(safe-area-inset-bottom));display:none;z-index:20;
+  }
+  .panel.open{display:block}
+  .panel-inner{max-width:640px;margin:0 auto}
+  .panel h2{font-size:1.75em;font-weight:800;letter-spacing:-.025em;margin:0 0 6px;text-transform:uppercase;text-wrap:balance}
+  .panel h3{font-size:1.05em;font-weight:700;margin:28px 0 8px}
+  .panel p{font-size:.92em;line-height:1.62;color:var(--ink-soft);margin:0 0 13px}
+  .panel p strong{color:var(--ink)}
+  .eyebrow{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.66em;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);
+    font-weight:600;display:block;margin-bottom:8px;
+  }
+  .panel ul{margin:0 0 14px;padding-left:20px;font-size:.9em;line-height:1.6;color:var(--ink-soft)}
+  .panel li{margin-bottom:8px}
+  .panel li::marker{color:var(--amber)}
+  .panel li strong{color:var(--ink)}
+
+  .btn{
+    pointer-events:auto;display:block;width:100%;background:var(--ink);color:var(--paper);
+    border:1px solid var(--ink);border-radius:3px;padding:14px 18px;font-size:1em;font-weight:700;
+    font-family:inherit;cursor:pointer;text-align:left;margin-bottom:9px;letter-spacing:-.01em;
+  }
+  .btn:active{opacity:.85}
+  .btn.ghost{background:transparent;color:var(--ink)}
+  .btn.amber{background:var(--amber);border-color:var(--amber);color:var(--paper)}
+  .btn .sub{display:block;font-weight:400;font-size:.78em;opacity:.72;margin-top:3px;letter-spacing:0}
+  .btn[disabled]{opacity:.4;cursor:not-allowed}
+
+  .preset{
+    pointer-events:auto;display:block;width:100%;text-align:left;background:var(--surface);
+    border:1px solid var(--rule);border-left:3px solid var(--rule);border-radius:3px;
+    padding:13px 15px;margin-bottom:8px;cursor:pointer;font-family:inherit;color:var(--ink);
+  }
+  .preset.sel{border-left-color:var(--amber);background:var(--surface-2)}
+  .preset .n{font-weight:700;font-size:1em}
+  .preset .d{font-size:.8em;color:var(--ink-soft);margin-top:3px;line-height:1.4}
+
+  .statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:2px;margin:0 0 18px}
+  .statgrid div{background:var(--surface);padding:12px 14px}
+  .statgrid .k{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.6em;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint);display:block}
+  .statgrid .v{font-size:1.4em;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.3}
+
+  .lmlist{list-style:none;padding:0;margin:0 0 16px;font-size:.88em}
+  .lmlist li{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--rule);color:var(--ink);margin:0}
+  .lmlist .dot{width:9px;height:9px;border-radius:50%;flex:none}
+
+  .titlecard{padding-top:3vh}
+  .titlecard h1{font-size:clamp(42px,13vw,72px);font-weight:800;line-height:.92;letter-spacing:-.035em;text-transform:uppercase;margin:0 0 14px}
+  .titlecard .tag{font-size:1.02em;color:var(--ink-soft);line-height:1.5;margin:0 0 24px;max-width:30em}
+  .divider{height:1px;background:var(--rule);margin:24px 0}
+  .fineprint{font-size:.76em;color:var(--ink-faint);line-height:1.6;margin-top:22px}
+
+  /* claim cards in the info panel */
+  .claims{display:flex;flex-direction:column;gap:2px;margin:0 0 20px}
+  .claim{background:var(--surface);border-left:3px solid var(--amber);padding:16px 18px}
+  .claim .h{font-weight:700;font-size:1em;margin-bottom:5px}
+  .claim .b{font-size:.88em;color:var(--ink-soft);line-height:1.55}
+  .claim .src{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.68em;color:var(--ink-faint);margin-top:8px;letter-spacing:.02em;line-height:1.45;
+  }
+
+  .bignum{
+    display:flex;gap:16px;align-items:baseline;background:var(--surface-2);
+    padding:18px 20px;margin:0 0 20px;border-top:2px solid var(--amber);
+  }
+  .bignum .n{font-size:2.6em;font-weight:800;line-height:1;letter-spacing:-.03em;color:var(--amber);font-variant-numeric:tabular-nums}
+  .bignum .t{font-size:.88em;line-height:1.5;color:var(--ink-soft)}
+
+  /* ---------------- knowledge test ---------------- */
+  #testCanvas{
+    width:100%;height:auto;display:block;background:var(--board);
+    border:1px solid var(--rule);border-radius:3px;margin:0 0 14px;touch-action:none;
+  }
+  .qhead{
+    display:flex;justify-content:space-between;align-items:baseline;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.68em;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:10px;
+  }
+  .qtext{font-size:1.15em;font-weight:700;line-height:1.35;margin:0 0 6px;text-wrap:balance}
+  .qhint{font-size:.84em;color:var(--ink-soft);margin:0 0 14px;line-height:1.5}
+  .choices{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+  .choices button{
+    background:var(--surface);border:1px solid var(--rule);border-radius:3px;color:var(--ink);
+    font-family:inherit;font-size:1em;font-weight:600;padding:15px 16px;text-align:left;cursor:pointer;
+  }
+  .choices button:active{background:var(--surface-2)}
+  .scorebar{height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;margin:0 0 18px}
+  .scorebar i{display:block;height:100%;background:var(--amber)}
+
+  @media (max-height:600px){
+    .titlecard{padding-top:0}
+    .titlecard h1{font-size:clamp(32px,9vw,48px)}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="map"></canvas>
+
+<div id="hud">
+  <div>
+    <div class="topbar">
+      <div class="plate"><span class="k">City</span><span class="v" id="hCity">&mdash;</span></div>
+      <div class="plate"><span class="k">Shift</span><span class="v" id="hShift">&mdash;</span></div>
+      <div class="plate"><span class="k">Rating</span><span class="v" id="hRating">0</span></div>
+      <div class="spacer"></div>
+      <button class="iconbtn" id="btnKnowledge" title="What you know" aria-label="What you know">?</button>
+      <button class="iconbtn" id="btnMenu" title="Menu" aria-label="Menu">&#9776;</button>
+    </div>
+    <div class="fare" id="fareBanner">
+      <span class="k" id="fareKind">Learn the city</span>
+      <div class="target" id="fareTarget">Drive around and find the landmarks</div>
+      <div class="sub" id="fareSub"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="probe" id="probe">
+      <div class="q" id="probeQ">What did you just see?</div>
+      <div class="opts" id="probeOpts"></div>
+    </div>
+    <div class="controls">
+      <div class="dpad" id="dpad">
+        <button class="u" data-dir="up" aria-label="North">&#9650;</button>
+        <button class="l" data-dir="left" aria-label="West">&#9664;</button>
+        <button class="c" disabled aria-hidden="true"></button>
+        <button class="r" data-dir="right" aria-label="East">&#9654;</button>
+        <button class="d" data-dir="down" aria-label="South">&#9660;</button>
+      </div>
+      <div class="legend" id="legend">
+        <b>Arrow keys</b> or the pad to drive. Solid streets you've driven; dashed ones you've only glimpsed from a junction. There is no map &mdash; that's the point.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"><div class="big"></div><div class="small"></div></div>
+
+<!-- ---------------- title ---------------- -->
+<div class="panel open" id="panelTitle">
+  <div class="panel-inner titlecard">
+    <span class="eyebrow">A navigation game with no map</span>
+    <h1>The<br>Knowledge</h1>
+    <p class="tag">You drive a cab in a city you've never seen. No map, no route line, no arrow pointing the way &mdash; you learn the streets by driving them, and you're paid on how well you remember.</p>
+
+    <button class="btn" id="btnStart">Start driving<span class="sub" id="startSub">New city</span></button>
+    <button class="btn amber" id="btnWhy">What this does for your brain<span class="sub">Why a game with no map is the useful kind</span></button>
+
+    <div class="divider"></div>
+    <span class="eyebrow">Difficulty</span>
+    <div id="presetList"></div>
+
+    <p class="fineprint">Named after the London cabbies' exam. Plain HTML, no accounts, no tracking &mdash; progress is saved on this device only. Not medical advice, and no game can claim to prevent Alzheimer's disease.</p>
+  </div>
+</div>
+
+<!-- ---------------- why / science ---------------- -->
+<div class="panel" id="panelWhy">
+  <div class="panel-inner">
+    <span class="eyebrow">What this does for your brain</span>
+    <h2>Why the map is missing</h2>
+
+    <div class="bignum">
+      <span class="n">1<span style="font-size:.5em">in</span>100</span>
+      <span class="t">Taxi and ambulance drivers died of Alzheimer's at about <strong>1 in 100</strong>, against <strong>1 in 60</strong> for everyone else &mdash; across 9 million US death records and 443 occupations.</span>
+    </div>
+
+    <p><strong>Bus drivers and airline pilots got no such benefit.</strong> That's the detail this whole game is built on. They drive all day too &mdash; but along fixed routes. What seems to matter is the live wayfinding: working out where you are, holding a destination in mind, and redrawing the plan when the road ahead is shut.</p>
+
+    <p>That work is done by the hippocampus, which is among the very first regions Alzheimer's damages &mdash; which is why getting lost in familiar places is one of the earliest symptoms. London cabbies who'd passed the real Knowledge exam were found to have measurably more grey matter in part of it, and the longer they'd driven, the more they had.</p>
+
+    <h3>So here's what each part of the game is for</h3>
+    <div class="claims">
+      <div class="claim">
+        <div class="h">No map, no minimap, no route line</div>
+        <div class="b">Turn-by-turn directions let you follow instructions instead of building a mental map &mdash; and people who habitually navigate that way score worse on spatial memory over time. Withholding the map is the entire active ingredient.</div>
+        <div class="src">Dahmani &amp; Bohbot, Scientific Reports 2020</div>
+      </div>
+      <div class="claim">
+        <div class="h">Every city is new, and no route repeats</div>
+        <div class="b">Drive the same route often enough and it stops being navigation &mdash; it becomes a memorised sequence of turns, which runs on a different part of the brain entirely. Novelty is what keeps the useful part working.</div>
+        <div class="src">Konishi &amp; Bohbot 2013 · Synapse Project 2014</div>
+      </div>
+      <div class="claim">
+        <div class="h">The Knowledge Test</div>
+        <div class="b">Pointing at a landmark you can't see, and placing them on a blank grid, can't be faked by remembering turns. They measure the map you've actually built &mdash; which is the thing worth training.</div>
+        <div class="src">Standard measures of allocentric spatial memory</div>
+      </div>
+      <div class="claim">
+        <div class="h">The hails that flash at the edge of your eye</div>
+        <div class="b">Spotting something brief in your peripheral vision, while already busy navigating, is the one style of brain training ever shown to lower dementia rates in a randomised trial. The flashes get shorter as you get better.</div>
+        <div class="src">ACTIVE trial: 29% lower at 10 years, 25% at 20</div>
+      </div>
+      <div class="claim">
+        <div class="h">Refreshers on cities you've left behind</div>
+        <div class="b">In that same trial, people who did the training once got no lasting benefit at all. The entire effect came from those who returned for short refresher sessions years later. So this game brings your old cities back &mdash; a day later, a week, a month, six months.</div>
+        <div class="src">ACTIVE 20-year follow-up, 2026</div>
+      </div>
+    </div>
+
+    <h3>How to get the most out of it</h3>
+    <ul>
+      <li><strong>Short and often beats long and rare.</strong> A five-fare shift takes about five minutes. In the trial above, the total training that shifted 20-year dementia rates added up to under 24 hours.</li>
+      <li><strong>Take the refreshers when they're offered.</strong> That's not a nag to keep you playing &mdash; on the evidence, it's the part that counts.</li>
+      <li><strong>Move on when a city starts feeling easy.</strong> Comfortable means you've stopped navigating and started remembering turns.</li>
+      <li><strong>Resist the urge to sketch it on paper.</strong> The whole point is the map living in your head.</li>
+    </ul>
+
+    <h3>What this game can't claim</h3>
+    <p>It would be easy to oversell this, so plainly: <strong>nobody has tested whether doing this on a screen protects the brain the way driving a real city does.</strong> The researchers behind the taxi finding say so themselves. The study is also observational &mdash; people who are good at navigating may simply be drawn to the job.</p>
+    <p>The biggest known levers aren't games at all. Roughly <strong>45% of dementia cases</strong> are linked to 14 things you can act on: hearing, blood pressure, cholesterol, vision, exercise, smoking, drinking, sleep, head injury, air quality, depression, diabetes, education and staying socially connected. Aerobic exercise alone measurably grows the same brain region this game aims at. A game is a small, enjoyable addition to those &mdash; not a replacement.</p>
+    <p>And most "brain training" only makes you better at itself. This one measures how well you know a made-up city. That is honestly all it measures.</p>
+
+    <div class="divider"></div>
+    <p class="fineprint">Sources: The Conversation on taxi drivers &amp; Alzheimer's (2026) · Livingston et al., Lancet Commission on dementia (2024) · Edwards et al., ACTIVE trial (2017) and its 20-year follow-up (2026) · Erickson et al., PNAS (2011) · Maguire et al. on London taxi drivers (2000) · Park et al., Synapse Project (2014) · West et al., Molecular Psychiatry (2018).</p>
+    <button class="btn" data-close>Back</button>
+  </div>
+</div>
+
+<!-- ---------------- knowledge (what you know) ---------------- -->
+<div class="panel" id="panelKnowledge">
+  <div class="panel-inner">
+    <span class="eyebrow">What you know</span>
+    <h2 id="kTitle">The city</h2>
+    <div class="statgrid">
+      <div><span class="k">Streets driven</span><span class="v" id="kStreets">0%</span></div>
+      <div><span class="k">Landmarks</span><span class="v" id="kFound">0</span></div>
+      <div><span class="k">Best fare</span><span class="v" id="kBest">&mdash;</span></div>
+      <div><span class="k">Best test</span><span class="v" id="kTest">&mdash;</span></div>
+    </div>
+    <p>Landmarks you've discovered. Fares only ever use these &mdash; you'll never be sent somewhere you've never been.</p>
+    <ul class="lmlist" id="kList"></ul>
+    <p class="fineprint">There is deliberately no map on this screen. Where these places sit relative to one another is the thing you're building, and it lives in your head.</p>
+    <button class="btn" data-close>Back to the cab</button>
+  </div>
+</div>
+
+<!-- ---------------- menu ---------------- -->
+<div class="panel" id="panelMenu">
+  <div class="panel-inner">
+    <span class="eyebrow">Menu</span>
+    <h2>Cab rank</h2>
+    <div class="statgrid">
+      <div><span class="k">Rating</span><span class="v" id="mRating">0</span></div>
+      <div><span class="k">Level</span><span class="v" id="mLevel">1</span></div>
+      <div><span class="k">Fares</span><span class="v" id="mFares">0</span></div>
+      <div><span class="k">Avg efficiency</span><span class="v" id="mEff">&mdash;</span></div>
+    </div>
+    <button class="btn" data-close>Back to the cab</button>
+    <button class="btn amber" id="btnBooster" style="display:none"><span id="boosterLabel">Refresher due</span><span class="sub" id="boosterSub"></span></button>
+    <button class="btn ghost" id="btnTest">Take the Knowledge Test<span class="sub" id="testSub">Point, place and compare &mdash; measures the map in your head</span></button>
+    <button class="btn ghost" id="btnNewCity">Move to a new city<span class="sub">This one gets filed for a refresher later</span></button>
+    <button class="btn ghost" id="btnRotate">Rotating view<span class="sub" id="rotSub">Unlocks at Level 4</span></button>
+    <button class="btn ghost" id="btnUfov">Peripheral hails<span class="sub" id="ufovSub">On</span></button>
+    <button class="btn ghost" id="btnWhy2">What this does for your brain</button>
+    <button class="btn ghost" id="btnDiff">Change difficulty<span class="sub" id="diffSub">Cabbie</span></button>
+    <div class="divider"></div>
+    <button class="btn ghost" id="btnWipe">Erase all progress<span class="sub">Cannot be undone</span></button>
+    <!-- SUPPORT SLOT: a "Buy me a coffee" link or similar can drop in here. -->
+  </div>
+</div>
+
+<!-- ---------------- shift summary ---------------- -->
+<div class="panel" id="panelShift">
+  <div class="panel-inner">
+    <span class="eyebrow" id="sEyebrow">Shift complete</span>
+    <h2 id="sTitle">Off duty</h2>
+    <div class="statgrid">
+      <div><span class="k">Fares</span><span class="v" id="sFares">5</span></div>
+      <div><span class="k">Avg efficiency</span><span class="v" id="sEff">0%</span></div>
+      <div><span class="k">Rating earned</span><span class="v" id="sRating">0</span></div>
+    </div>
+    <p id="sNote"></p>
+    <button class="btn amber" id="btnTestFromShift">Take the Knowledge Test<span class="sub">Five questions. It's the part that measures what you've actually learned.</span></button>
+    <button class="btn" id="btnNextShift">Next shift</button>
+    <button class="btn ghost" id="btnNewCity2">Move to a new city</button>
+  </div>
+</div>
+
+<!-- ---------------- knowledge test ---------------- -->
+<div class="panel" id="panelTest">
+  <div class="panel-inner">
+    <div class="qhead"><span id="tProgress">Question 1 of 5</span><span id="tKind">Pointing</span></div>
+    <div class="scorebar"><i id="tBar" style="width:0%"></i></div>
+    <div id="tBody">
+      <p class="qtext" id="tQuestion">&nbsp;</p>
+      <p class="qhint" id="tHint">&nbsp;</p>
+      <canvas id="testCanvas" width="600" height="600"></canvas>
+      <div class="choices" id="tChoices"></div>
+      <button class="btn" id="tSubmit">Answer</button>
+      <button class="btn ghost" id="tQuit">Leave the test</button>
+    </div>
+    <div id="tResult" style="display:none">
+      <h2 id="tResTitle">Knowledge Test</h2>
+      <div class="statgrid">
+        <div><span class="k">Score</span><span class="v" id="tResScore">0%</span></div>
+        <div><span class="k">Rating earned</span><span class="v" id="tResRating">0</span></div>
+        <div><span class="k">Your best</span><span class="v" id="tResBest">0%</span></div>
+      </div>
+      <p id="tResNote"></p>
+      <button class="btn" id="tResDone">Back to the cab</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   Presets & content
+   ============================================================ */
+var PRESETS = {
+  cadet:    {name:"Cadet",         cols:6,  rows:5, landmarks:6,  needFound:3, view:5.0, speed:150, bigText:true,  desc:"Small city, few landmarks, large type, slower hails. A gentle way in."},
+  cabbie:   {name:"Cabbie",        cols:8,  rows:7, landmarks:9,  needFound:4, view:6.5, speed:175, bigText:false, desc:"The intended game. A city you can hold in your head, but only just."},
+  knowledge:{name:"Knowledge Boy", cols:11, rows:9, landmarks:14, needFound:5, view:8.0, speed:190, bigText:false, desc:"Dense street network, many landmarks, tight scoring. Named after the four-year London exam."}
+};
+var PRESET_ORDER = ["cadet","cabbie","knowledge"];
+
+var LM_NAMES = ["Clock Tower","Blue Market","The Cathedral","Old Docks","Rose Park","Iron Bridge","Grand Station","Fish Quay","The Observatory","Copper Mill","Lantern Square","Whitehall Baths","Emerald Gardens","St. Jude's","The Foundry","Kingsgate","Amber Theatre","Northgate Yard","The Almshouses","Sailmakers' Row"];
+var LM_COLORS = ["#C6522F","#2F7D8C","#B0821A","#5B7A2E","#8A4A88","#C2723C","#2E6B45","#8C3A2A","#3E5FA3","#7A6A2E","#A03C64","#357A6B","#8B5E3C","#4A4E8C"];
+var CITY_A = ["Ash","King","North","Ard","Bram","Cole","Dun","Elm","Fen","Grey","Haw","Marl","Pen","Ross","Stan","Thorn","Wick","Yarr"];
+var CITY_B = ["vale","port","moor","ford","gate","holm","bury","stead","mouth","ridge","combe","field","haven","cross","wick","don"];
+
+var DAY = 86400000;
+var BOOSTER_STEPS = [DAY, 7*DAY, 30*DAY, 180*DAY];
+
+/* ============================================================
+   Save state
+   ============================================================ */
+var SAVE_KEY = "knowledge.v2";
+var save = {
+  preset:"cabbie", cityPreset:"cabbie",
+  rating:0, fares:0, effSum:0, seed:0,
+  explored:[], found:[], shiftNo:1, fareInShift:0,
+  bestEff:0, rotate:false,
+  ufovOn:true, ufovMs:900, ufovHits:0, ufovTrials:0,
+  archive:[], tests:0, testBest:0, testSum:0
+};
+
+function load(){
+  try{
+    var raw = localStorage.getItem(SAVE_KEY);
+    if(raw){
+      var o = JSON.parse(raw);
+      for(var k in save){ if(Object.prototype.hasOwnProperty.call(o,k)) save[k] = o[k]; }
+    }
+  }catch(e){}
+}
+function persist(){
+  try{
+    if(city){
+      save.explored = [];
+      for(var k in city.explored){ if(city.explored[k]) save.explored.push(k); }
+      save.found = city.found.slice();
+      save.cityPreset = city.preset;
+    }
+    localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+  }catch(e){}
+}
+function now(){ return Date.now(); }
+
+/* ============================================================
+   Seeded RNG
+   ============================================================ */
+function mulberry(a){
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ============================================================
+   City generation
+   ============================================================ */
+var city = null;
+function edgeKey(a,b){ return a < b ? a+"_"+b : b+"_"+a; }
+
+function buildCity(seed, preset){
+  var P = PRESETS[preset] || PRESETS.cabbie;
+  var rnd = mulberry(seed);
+  var cols = P.cols, rows = P.rows, SP = 100;
+
+  var nodes = [], x, y;
+  for(y=0; y<rows; y++){
+    for(x=0; x<cols; x++){
+      nodes.push({x:x*SP + (rnd()-0.5)*SP*0.30, y:y*SP + (rnd()-0.5)*SP*0.30, gx:x, gy:y, edges:[], lm:-1});
+    }
+  }
+  function id(a,b){ return b*cols + a; }
+
+  var cand = [];
+  for(y=0; y<rows; y++){
+    for(x=0; x<cols; x++){
+      if(x < cols-1) cand.push([id(x,y), id(x+1,y)]);
+      if(y < rows-1) cand.push([id(x,y), id(x,y+1)]);
+    }
+  }
+  var i,j,tmp;
+  for(i=cand.length-1; i>0; i--){ j = Math.floor(rnd()*(i+1)); tmp=cand[i]; cand[i]=cand[j]; cand[j]=tmp; }
+
+  var parent = [];
+  for(i=0;i<nodes.length;i++) parent[i]=i;
+  function find(a){ while(parent[a]!==a){ parent[a]=parent[parent[a]]; a=parent[a]; } return a; }
+  function union(a,b){ var ra=find(a), rb=find(b); if(ra===rb) return false; parent[ra]=rb; return true; }
+
+  var edges=[], used={}, c;
+  for(c=0;c<cand.length;c++){
+    if(union(cand[c][0],cand[c][1])){ edges.push(cand[c]); used[edgeKey(cand[c][0],cand[c][1])]=true; }
+  }
+  var extraTarget = Math.floor(cand.length*0.42);
+  for(c=0;c<cand.length && edges.length < (nodes.length-1)+extraTarget; c++){
+    var kk = edgeKey(cand[c][0],cand[c][1]);
+    if(!used[kk]){ edges.push(cand[c]); used[kk]=true; }
+  }
+
+  var elen = {};
+  for(var e=0;e<edges.length;e++){
+    var a=edges[e][0], b=edges[e][1];
+    var dx=nodes[a].x-nodes[b].x, dy=nodes[a].y-nodes[b].y;
+    elen[edgeKey(a,b)] = Math.sqrt(dx*dx+dy*dy);
+    nodes[a].edges.push(b); nodes[b].edges.push(a);
+  }
+
+  var pool=[];
+  for(i=0;i<nodes.length;i++) pool.push(i);
+  for(i=pool.length-1;i>0;i--){ j=Math.floor(rnd()*(i+1)); tmp=pool[i]; pool[i]=pool[j]; pool[j]=tmp; }
+
+  var picks=[], minSep = SP*(cols>8 ? 1.7 : 1.4);
+  for(i=0;i<pool.length && picks.length<P.landmarks;i++){
+    var cn = nodes[pool[i]], ok = true;
+    for(j=0;j<picks.length;j++){
+      var o=nodes[picks[j]], ddx=o.x-cn.x, ddy=o.y-cn.y;
+      if(Math.sqrt(ddx*ddx+ddy*ddy) < minSep){ ok=false; break; }
+    }
+    if(ok) picks.push(pool[i]);
+  }
+  for(i=0;i<pool.length && picks.length<P.landmarks;i++){
+    if(picks.indexOf(pool[i])===-1) picks.push(pool[i]);
+  }
+
+  var nameOrder = LM_NAMES.slice();
+  for(i=nameOrder.length-1;i>0;i--){ j=Math.floor(rnd()*(i+1)); tmp=nameOrder[i]; nameOrder[i]=nameOrder[j]; nameOrder[j]=tmp; }
+
+  var landmarks=[];
+  for(i=0;i<picks.length;i++){
+    nodes[picks[i]].lm = i;
+    landmarks.push({node:picks[i], name:nameOrder[i % nameOrder.length], color:LM_COLORS[i % LM_COLORS.length]});
+  }
+
+  var cname = CITY_A[Math.floor(rnd()*CITY_A.length)] + CITY_B[Math.floor(rnd()*CITY_B.length)];
+
+  return {seed:seed, preset:preset, cols:cols, rows:rows, spacing:SP,
+          nodes:nodes, edges:edges, elen:elen, landmarks:landmarks, name:cname,
+          explored:{}, seen:{}, visited:{}, found:[]};
+}
+
+function distancesFrom(src){
+  var dist = new Float64Array(city.nodes.length);
+  for(var i=0;i<dist.length;i++) dist[i]=Infinity;
+  dist[src]=0;
+  var heap=[[0,src]];
+  function push(it){
+    heap.push(it);
+    var i=heap.length-1;
+    while(i>0){ var p=(i-1)>>1; if(heap[p][0]<=heap[i][0]) break; var t=heap[p]; heap[p]=heap[i]; heap[i]=t; i=p; }
+  }
+  function pop(){
+    var top=heap[0], last=heap.pop();
+    if(heap.length){
+      heap[0]=last; var i=0;
+      for(;;){ var l=2*i+1,r=l+1,m=i;
+        if(l<heap.length&&heap[l][0]<heap[m][0]) m=l;
+        if(r<heap.length&&heap[r][0]<heap[m][0]) m=r;
+        if(m===i) break; var t=heap[m]; heap[m]=heap[i]; heap[i]=t; i=m; }
+    }
+    return top;
+  }
+  while(heap.length){
+    var cur=pop(), d=cur[0], u=cur[1];
+    if(d>dist[u]) continue;
+    var nb=city.nodes[u].edges;
+    for(var k=0;k<nb.length;k++){
+      var v=nb[k], nd=d+city.elen[edgeKey(u,v)];
+      if(nd < dist[v]-1e-9){ dist[v]=nd; push([nd,v]); }
+    }
+  }
+  return dist;
+}
+
+/* ============================================================
+   Game state
+   ============================================================ */
+var G = {
+  running:false, at:0, from:-1, to:-1, t:0, heading:0,
+  queued:null, travelled:0, fare:null, fareCooldown:false,
+  lastTs:0, camX:0, camY:0,
+  sinceHail:0, nextHail:700,
+  hail:null   // {phase:'show'|'ask', shape, corner, t0, probeKind}
+};
+
+var els = {};
+["map","hCity","hShift","hRating","fareKind","fareTarget","fareSub","toast","dpad","legend",
+ "panelTitle","panelWhy","panelKnowledge","panelMenu","panelShift","panelTest",
+ "presetList","btnStart","startSub","btnWhy","btnWhy2","btnKnowledge","btnMenu",
+ "btnNewCity","btnNewCity2","btnRotate","rotSub","btnUfov","ufovSub","btnDiff","diffSub","btnWipe",
+ "btnNextShift","btnTest","btnTestFromShift","btnBooster","boosterLabel","boosterSub","testSub",
+ "kStreets","kFound","kBest","kTest","kList","kTitle",
+ "mRating","mLevel","mFares","mEff","sFares","sEff","sRating","sNote","sTitle","sEyebrow",
+ "probe","probeQ","probeOpts",
+ "tProgress","tKind","tBar","tBody","tQuestion","tHint","testCanvas","tChoices","tSubmit","tQuit",
+ "tResult","tResTitle","tResScore","tResRating","tResBest","tResNote","tResDone"]
+ .forEach(function(id){ els[id] = document.getElementById(id); });
+
+var canvas = els.map, ctx = canvas.getContext("2d");
+var DPR=1, VW=0, VH=0;
+
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  VW = window.innerWidth; VH = window.innerHeight;
+  canvas.width = Math.round(VW*DPR); canvas.height = Math.round(VH*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener("resize", resize);
+
+function css(v){ return getComputedStyle(document.body).getPropertyValue(v).trim(); }
+function level(){ return 1 + Math.floor(save.rating/500); }
+function rotateAllowed(){ return level() >= 4; }
+function rotateActive(){ return save.rotate && rotateAllowed(); }
+
+/* ============================================================
+   Rendering
+   ============================================================ */
+function cabPos(){
+  if(G.from >= 0){
+    var a=city.nodes[G.from], b=city.nodes[G.to];
+    return {x:a.x+(b.x-a.x)*G.t, y:a.y+(b.y-a.y)*G.t};
+  }
+  var n=city.nodes[G.at];
+  return {x:n.x, y:n.y};
+}
+
+function draw(){
+  if(!city) return;
+  var C = {
+    paper:css("--paper"), road:css("--road"), roadSeen:css("--road-seen"),
+    ink:css("--ink"), inkFaint:css("--ink-faint"), lamp:css("--amber-lamp"),
+    amber:css("--amber"), cab:css("--cab")
+  };
+  ctx.fillStyle = C.paper;
+  ctx.fillRect(0,0,VW,VH);
+
+  var P = PRESETS[city.preset];
+  var scale = Math.min(VW,VH) / (P.view * city.spacing);
+  var inv = 1/scale;
+  var pos = cabPos();
+  G.camX += (pos.x-G.camX)*0.22;
+  G.camY += (pos.y-G.camY)*0.22;
+
+  var anchorY = VH*0.56;
+  ctx.save();
+  ctx.translate(VW/2, anchorY);
+  ctx.scale(scale, scale);
+  if(rotateActive()) ctx.rotate(-G.heading - Math.PI/2);
+  ctx.translate(-G.camX, -G.camY);
+
+  var M = ctx.getTransform();
+  function toScreen(wx,wy){ return {x:(M.a*wx+M.c*wy+M.e)/DPR, y:(M.b*wx+M.d*wy+M.f)/DPR}; }
+  var hudTop = 150 + (P.bigText ? 24 : 0);
+  var hudBottom = VH - 110;
+
+  var e,a,b;
+  ctx.lineCap="butt"; ctx.strokeStyle=C.roadSeen; ctx.lineWidth=7;
+  ctx.setLineDash([11,13]); ctx.beginPath();
+  for(e=0;e<city.edges.length;e++){
+    a=city.edges[e][0]; b=city.edges[e][1];
+    var k=edgeKey(a,b);
+    if(city.explored[k] || !city.seen[k]) continue;
+    ctx.moveTo(city.nodes[a].x, city.nodes[a].y);
+    ctx.lineTo(city.nodes[b].x, city.nodes[b].y);
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+
+  ctx.lineCap="round"; ctx.strokeStyle=C.road; ctx.lineWidth=15; ctx.beginPath();
+  for(e=0;e<city.edges.length;e++){
+    a=city.edges[e][0]; b=city.edges[e][1];
+    if(!city.explored[edgeKey(a,b)]) continue;
+    ctx.moveTo(city.nodes[a].x, city.nodes[a].y);
+    ctx.lineTo(city.nodes[b].x, city.nodes[b].y);
+  }
+  ctx.stroke();
+
+  for(var L=0; L<city.landmarks.length; L++){
+    var lm=city.landmarks[L], nd=city.nodes[lm.node];
+    var known = city.found.indexOf(L) !== -1;
+    var glimpsed = city.seen["n"+lm.node];
+    if(!known && !glimpsed) continue;
+
+    ctx.beginPath();
+    ctx.arc(nd.x, nd.y, known?15:11, 0, Math.PI*2);
+    ctx.fillStyle = known ? lm.color : C.inkFaint;
+    ctx.globalAlpha = known ? 1 : 0.45;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    if(known){
+      ctx.beginPath(); ctx.arc(nd.x, nd.y, 6, 0, Math.PI*2);
+      ctx.fillStyle = C.paper; ctx.fill();
+    }
+
+    var sp = toScreen(nd.x, nd.y);
+    var labelW = known ? lm.name.length*8.5 : 12;
+    if(sp.y < hudTop || sp.y > hudBottom || sp.x-labelW/2 < 6 || sp.x+labelW/2 > VW-6) continue;
+
+    ctx.save();
+    ctx.translate(nd.x, nd.y);
+    if(rotateActive()) ctx.rotate(G.heading + Math.PI/2);
+    ctx.scale(inv, inv);
+    ctx.font = (P.bigText ? "700 17px " : "700 15px ") + "'Helvetica Neue',Helvetica,Arial,sans-serif";
+    ctx.textAlign="center"; ctx.textBaseline="bottom";
+    var label = known ? lm.name : "?";
+    var ly = -(known ? 16 : 13);
+    ctx.lineWidth=4; ctx.strokeStyle=C.paper; ctx.lineJoin="round";
+    ctx.strokeText(label, 0, ly);
+    ctx.fillStyle = known ? C.ink : C.inkFaint;
+    ctx.fillText(label, 0, ly);
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.translate(pos.x,pos.y); ctx.rotate(G.heading);
+  ctx.fillStyle = C.cab;
+  ctx.beginPath(); ctx.moveTo(14,0); ctx.lineTo(-9,8); ctx.lineTo(-5,0); ctx.lineTo(-9,-8);
+  ctx.closePath(); ctx.fill();
+  if(G.fare && G.fare.phase==="toDrop"){
+    ctx.fillStyle=C.lamp; ctx.beginPath(); ctx.arc(0,0,4.2,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+  ctx.restore();
+
+  drawHail(C, anchorY);
+}
+
+/* ============================================================
+   Peripheral hail  (useful-field-of-view style speed task)
+   ============================================================ */
+var SHAPES = ["circle","square","triangle","diamond"];
+var SHAPE_LABEL = {circle:"Circle", square:"Square", triangle:"Triangle", diamond:"Diamond"};
+var CORNERS = [
+  {k:"up-left",    label:"Up-left",    dx:-1, dy:-1},
+  {k:"up-right",   label:"Up-right",   dx: 1, dy:-1},
+  {k:"down-left",  label:"Down-left",  dx:-1, dy: 1},
+  {k:"down-right", label:"Down-right", dx: 1, dy: 1}
+];
+
+function hailPoint(corner, anchorY){
+  var r = Math.min(VW,VH)*0.34;
+  var x = VW/2 + corner.dx*r*0.78;
+  var y = anchorY + corner.dy*r*0.78;
+  y = Math.max(180, Math.min(VH-190, y));
+  x = Math.max(44, Math.min(VW-44, x));
+  return {x:x, y:y};
+}
+
+function drawHail(C, anchorY){
+  if(!G.hail || G.hail.phase !== "show") return;
+  var h = G.hail;
+  var p = hailPoint(h.corner, anchorY);
+  var s = 20;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.fillStyle = C.lamp;
+  ctx.strokeStyle = C.amber;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  if(h.shape === "circle"){ ctx.arc(0,0,s,0,Math.PI*2); }
+  else if(h.shape === "square"){ ctx.rect(-s,-s,s*2,s*2); }
+  else if(h.shape === "triangle"){ ctx.moveTo(0,-s); ctx.lineTo(s,s); ctx.lineTo(-s,s); ctx.closePath(); }
+  else { ctx.moveTo(0,-s*1.2); ctx.lineTo(s*1.05,0); ctx.lineTo(0,s*1.2); ctx.lineTo(-s*1.05,0); ctx.closePath(); }
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
+function maybeStartHail(dist){
+  if(!save.ufovOn || G.hail || !G.running) return;
+  if(els.panelTest.classList.contains("open")) return;
+  G.sinceHail += dist;
+  if(G.sinceHail < G.nextHail) return;
+  G.sinceHail = 0;
+  G.nextHail = 620 + Math.random()*640;
+  G.hail = {
+    phase:"show",
+    shape: SHAPES[Math.floor(Math.random()*SHAPES.length)],
+    corner: CORNERS[Math.floor(Math.random()*CORNERS.length)],
+    t0: now(),
+    probeKind: Math.random() < 0.5 ? "shape" : "corner"
+  };
+}
+
+function stepHail(){
+  if(!G.hail) return;
+  if(G.hail.phase === "show" && now() - G.hail.t0 >= save.ufovMs){
+    G.hail.phase = "ask";
+    askHail();
+  }
+}
+
+function askHail(){
+  var h = G.hail;
+  var opts, correct;
+  if(h.probeKind === "shape"){
+    els.probeQ.textContent = "What shape was that?";
+    opts = SHAPES.map(function(s){ return {k:s, label:SHAPE_LABEL[s]}; });
+    correct = h.shape;
+  } else {
+    els.probeQ.textContent = "Where did it appear?";
+    opts = CORNERS.map(function(c){ return {k:c.k, label:c.label}; });
+    correct = h.corner.k;
+  }
+  // shuffle so position doesn't give it away
+  for(var i=opts.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=opts[i]; opts[i]=opts[j]; opts[j]=t; }
+
+  els.probeOpts.innerHTML = "";
+  opts.forEach(function(o){
+    var b = document.createElement("button");
+    b.textContent = o.label;
+    b.addEventListener("click", function(){ answerHail(o.k === correct); });
+    els.probeOpts.appendChild(b);
+  });
+  els.probe.classList.add("open");
+}
+
+function answerHail(right){
+  els.probe.classList.remove("open");
+  els.probeOpts.innerHTML = "";
+  G.hail = null;
+  save.ufovTrials += 1;
+  if(right){
+    save.ufovHits += 1;
+    save.ufovMs = Math.max(110, Math.round(save.ufovMs * 0.86));
+    save.rating += 12;
+    toast("Spotted it", "Next one flashes for " + save.ufovMs + "ms &nbsp;+12", 1300);
+  } else {
+    save.ufovMs = Math.min(1500, Math.round(save.ufovMs * 1.28));
+    toast("Missed", "Slowing down to " + save.ufovMs + "ms", 1300);
+  }
+  persist(); syncHud();
+}
+
+/* ============================================================
+   Movement
+   ============================================================ */
+function revealAround(node){
+  city.visited["n"+node] = true;
+  var nb = city.nodes[node].edges;
+  for(var i=0;i<nb.length;i++){
+    city.seen[edgeKey(node,nb[i])] = true;
+    city.seen["n"+nb[i]] = true;
+  }
+  city.seen["n"+node] = true;
+  var lm = city.nodes[node].lm;
+  if(lm >= 0 && city.found.indexOf(lm) === -1){
+    city.found.push(lm);
+    toast(city.landmarks[lm].name, "Landmark found &mdash; " + city.found.length + " of " + city.landmarks.length, 1500);
+    persist(); updateFareBanner();
+  }
+}
+
+function dirVector(d){
+  if(d==="up") return {x:0,y:-1};
+  if(d==="down") return {x:0,y:1};
+  if(d==="left") return {x:-1,y:0};
+  return {x:1,y:0};
+}
+
+function tryMove(d){
+  if(!G.running) return;
+  var want;
+  if(rotateActive()){
+    var ang = G.heading;
+    if(d==="left") ang = G.heading - Math.PI/2;
+    if(d==="right") ang = G.heading + Math.PI/2;
+    if(d==="down") ang = G.heading + Math.PI;
+    want = {x:Math.cos(ang), y:Math.sin(ang)};
+  } else {
+    want = dirVector(d);
+  }
+
+  if(G.from >= 0){
+    var a=city.nodes[G.from], b=city.nodes[G.to];
+    var ex=b.x-a.x, ey=b.y-a.y, mag=Math.sqrt(ex*ex+ey*ey)||1;
+    if((ex/mag)*want.x + (ey/mag)*want.y < -0.6){
+      var tf=G.from; G.from=G.to; G.to=tf; G.t=1-G.t;
+      var na=city.nodes[G.from], nb2=city.nodes[G.to];
+      G.heading = Math.atan2(nb2.y-na.y, nb2.x-na.x);
+      G.queued = null;
+      return;
+    }
+    G.queued = d;
+    return;
+  }
+
+  var here=city.nodes[G.at], best=-1, bestDot=0.35;
+  for(var i=0;i<here.edges.length;i++){
+    var nn=city.nodes[here.edges[i]];
+    var vx=nn.x-here.x, vy=nn.y-here.y, m=Math.sqrt(vx*vx+vy*vy)||1;
+    var dd=(vx/m)*want.x + (vy/m)*want.y;
+    if(dd > bestDot){ bestDot=dd; best=here.edges[i]; }
+  }
+  if(best < 0) return;
+  G.from=G.at; G.to=best; G.t=0;
+  var f=city.nodes[G.from], t2=city.nodes[G.to];
+  G.heading = Math.atan2(t2.y-f.y, t2.x-f.x);
+  G.queued = null;
+}
+
+function step(dt){
+  stepHail();
+  if(!G.running || G.from < 0) return;
+  var P = PRESETS[city.preset];
+  var len = city.elen[edgeKey(G.from,G.to)];
+  var adv = (P.speed*dt)/len;
+  var before = G.t;
+  G.t += adv;
+  var moved = Math.min(adv, 1-before)*len;
+  G.travelled += moved;
+  maybeStartHail(moved);
+
+  if(G.t >= 1){
+    G.t=0; G.at=G.to;
+    city.explored[edgeKey(G.from,G.to)] = true;
+    G.from=-1; G.to=-1;
+    revealAround(G.at);
+    checkFare();
+    if(G.queued){ var q=G.queued; G.queued=null; tryMove(q); }
+    persist();
+  }
+}
+
+/* ============================================================
+   Fares
+   ============================================================ */
+function updateFareBanner(){
+  if(!city) return;
+  var need = PRESETS[city.preset].needFound;
+  if(city.found.length < need){
+    els.fareKind.innerHTML = "Learn the city";
+    var left = need - city.found.length;
+    els.fareTarget.textContent = "Find " + left + " more landmark" + (left===1?"":"s");
+    els.fareSub.textContent = "Drive anywhere. Landmarks appear as you reach them. Fares start once you know enough of the city.";
+    return;
+  }
+  if(!G.fare){
+    els.fareKind.innerHTML = "Ready";
+    els.fareTarget.textContent = "Waiting for a fare…";
+    els.fareSub.textContent = "";
+    return;
+  }
+  var f = G.fare;
+  if(f.phase === "toPickup"){
+    els.fareKind.innerHTML = "Pick up at";
+    els.fareTarget.textContent = city.landmarks[f.pickup].name;
+    els.fareSub.textContent = "Then on to " + city.landmarks[f.drop].name + ".";
+  } else {
+    els.fareKind.innerHTML = "Passenger aboard — drop at";
+    els.fareTarget.textContent = city.landmarks[f.drop].name;
+    els.fareSub.textContent = "Shortest way you can find. You're paid on efficiency, not speed.";
+  }
+}
+
+function newFare(){
+  var known = city.found.slice();
+  if(known.length < 2){ G.fare=null; updateFareBanner(); return; }
+  var dist = distancesFrom(G.at);
+  var tries=0, pickup=-1, drop=-1;
+  while(tries++ < 300){
+    var pu = known[Math.floor(Math.random()*known.length)];
+    var dr = known[Math.floor(Math.random()*known.length)];
+    if(pu===dr) continue;
+    if(city.landmarks[pu].node === G.at) continue;
+    pickup=pu; drop=dr; break;
+  }
+  if(pickup < 0){ G.fare=null; updateFareBanner(); return; }
+  var dFrom = distancesFrom(city.landmarks[pickup].node);
+  var optimal = dist[city.landmarks[pickup].node] + dFrom[city.landmarks[drop].node];
+  G.fare = {pickup:pickup, drop:drop, phase:"toPickup", optimal:optimal};
+  G.travelled = 0;
+  updateFareBanner();
+}
+
+function checkFare(){
+  if(!city) return;
+  if(!G.fare){
+    if(!G.fareCooldown && city.found.length >= PRESETS[city.preset].needFound) newFare();
+    return;
+  }
+  var f = G.fare;
+  if(f.done) return;
+  if(f.phase==="toPickup" && G.at===city.landmarks[f.pickup].node){
+    f.phase="toDrop"; updateFareBanner();
+    toast("Passenger aboard", "To " + city.landmarks[f.drop].name, 1300);
+    return;
+  }
+  if(f.phase==="toDrop" && G.at===city.landmarks[f.drop].node) completeFare();
+}
+
+function completeFare(){
+  var f = G.fare;
+  f.done = true; G.fareCooldown = true;
+  var eff = G.travelled>0 ? Math.max(0, Math.min(1, f.optimal/G.travelled)) : 1;
+  var pct = Math.round(eff*100);
+  var earned = Math.round(20 + eff*eff*130);
+
+  save.rating += earned; save.fares += 1; save.effSum += eff;
+  if(pct > save.bestEff) save.bestEff = pct;
+  save.fareInShift += 1;
+
+  var verdict = pct>=92 ? "Straight there." : pct>=78 ? "Decent line." : pct>=60 ? "The long way round." : "Scenic route.";
+  toast(pct + "% efficient", verdict + " &nbsp;+" + earned + " rating", 1900);
+
+  G.fare = null; persist(); syncHud();
+
+  if(save.fareInShift >= 5){
+    setTimeout(function(){ G.fareCooldown=false; endShift(); }, 1400);
+  } else {
+    setTimeout(function(){ G.fareCooldown=false; if(G.running) newFare(); }, 1500);
+  }
+}
+
+function streetsPct(){
+  var n=0;
+  for(var k in city.explored) if(city.explored[k]) n++;
+  return Math.round(100*n/city.edges.length);
+}
+
+function endShift(){
+  G.running = false;
+  els.sFares.textContent = save.fareInShift;
+  els.sEff.textContent = (save.fares ? Math.round((save.effSum/save.fares)*100) : 0) + "%";
+  els.sRating.textContent = save.rating;
+  els.sTitle.textContent = "Shift " + save.shiftNo + " done";
+
+  var pct = streetsPct(), note;
+  if(pct > 70){
+    note = "You've driven " + pct + "% of this city. Once a city gets familiar you start running on memorised turns rather than a map in your head — which trains a different, less useful part of the brain. Worth moving on soon.";
+  } else if(save.shiftNo >= 3){
+    note = "Three shifts here. Moving to a new city fairly often is deliberate — novelty is the part with evidence behind it, not repetition. This one gets filed for a refresher later.";
+  } else {
+    note = "You know " + pct + "% of these streets and " + city.found.length + " of " + city.landmarks.length + " landmarks. There's more city out there.";
+  }
+  els.sNote.textContent = note;
+
+  save.shiftNo += 1; save.fareInShift = 0;
+  persist();
+  openPanel(els.panelShift);
+}
+
+/* ============================================================
+   Boosters
+   ============================================================ */
+function archiveCurrent(){
+  if(!city || city.found.length < 2) return;
+  var explored = [];
+  for(var k in city.explored) if(city.explored[k]) explored.push(k);
+  var entry = {
+    seed:city.seed, preset:city.preset, name:city.name,
+    explored:explored, found:city.found.slice(),
+    streets:streetsPct(), stage:0, due:now()+BOOSTER_STEPS[0], filed:now()
+  };
+  save.archive = (save.archive||[]).filter(function(a){ return a.seed !== entry.seed; });
+  save.archive.unshift(entry);
+  if(save.archive.length > 12) save.archive.length = 12;
+}
+
+function dueBooster(){
+  var list = save.archive || [];
+  for(var i=0;i<list.length;i++){ if(list[i].due <= now()) return list[i]; }
+  return null;
+}
+function nextBooster(){
+  var list = save.archive || [];
+  return list.length ? list[0] : null;
+}
+function humanDue(entry){
+  var d = entry.due - now();
+  if(d <= 0) return "due now";
+  var days = Math.ceil(d/DAY);
+  return days === 1 ? "due tomorrow" : "due in " + days + " days";
+}
+
+function startBooster(entry){
+  archiveCurrent();
+  save.seed = entry.seed;
+  save.cityPreset = entry.preset;
+  save.explored = entry.explored.slice();
+  save.found = entry.found.slice();
+  save.shiftNo = 1; save.fareInShift = 0;
+  save.archive = save.archive.filter(function(a){ return a.seed !== entry.seed; });
+  G.boosterOf = entry;
+  startCity(entry.seed, true, entry.preset);
+  closePanels();
+  toast("Back to " + city.name, "A refresher on a city you learned before", 2200);
+  setTimeout(function(){ startTest(true); }, 1200);
+}
+
+function completeBooster(scorePct){
+  var e = G.boosterOf;
+  if(!e) return;
+  G.boosterOf = null;
+  e.stage = Math.min((e.stage||0)+1, BOOSTER_STEPS.length-1);
+  e.due = now() + BOOSTER_STEPS[e.stage];
+  e.explored = [];
+  for(var k in city.explored) if(city.explored[k]) e.explored.push(k);
+  e.found = city.found.slice();
+  save.archive.unshift(e);
+  if(save.archive.length > 12) save.archive.length = 12;
+  persist();
+}
+
+/* ============================================================
+   Knowledge Test
+   ============================================================ */
+var T = null;
+var tctx = els.testCanvas.getContext("2d");
+
+function shuffled(arr){
+  var a = arr.slice();
+  for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; }
+  return a;
+}
+
+function buildQuestions(){
+  var found = city.found.slice();
+  var qs = [];
+  if(found.length < 2) return qs;
+
+  // pointing questions
+  var pool = shuffled(found);
+  var wanted = Math.min(3, Math.max(1, found.length-1));
+  for(var i=0;i<wanted;i++){
+    var from = pool[i % pool.length];
+    var others = found.filter(function(f){ return f !== from; });
+    if(!others.length) continue;
+    var target = shuffled(others)[0];
+    qs.push({kind:"point", from:from, target:target});
+  }
+
+  // comparison question
+  if(found.length >= 3){
+    var s = shuffled(found);
+    qs.push({kind:"compare", anchor:s[0], a:s[1], b:s[2]});
+  }
+
+  // placement question
+  if(found.length >= 4){
+    qs.push({kind:"place", items:shuffled(found).slice(0, Math.min(6, found.length))});
+  }
+
+  return shuffled(qs).slice(0,5);
+}
+
+function startTest(isBooster){
+  var qs = buildQuestions();
+  if(!qs.length){
+    toast("Not yet", "Find at least two landmarks first", 1800);
+    return;
+  }
+  T = {qs:qs, i:0, scores:[], booster:!!isBooster, answer:null, placed:{}, drag:null};
+  els.tResult.style.display = "none";
+  els.tBody.style.display = "";
+  openPanel(els.panelTest);
+  renderQuestion();
+}
+
+function renderQuestion(){
+  var q = T.qs[T.i];
+  els.tProgress.textContent = "Question " + (T.i+1) + " of " + T.qs.length;
+  els.tBar.style.width = Math.round(100*T.i/T.qs.length) + "%";
+  els.tChoices.innerHTML = "";
+  els.tSubmit.style.display = "";
+  T.answer = null;
+
+  sizeCanvasFor(q.kind);
+
+  if(q.kind === "point"){
+    els.tKind.textContent = "Pointing";
+    els.tQuestion.textContent = "You're standing at " + city.landmarks[q.from].name + ". Which way is " + city.landmarks[q.target].name + "?";
+    els.tHint.textContent = "North is up. Drag the needle, then answer. Straight-line direction, not the driving route.";
+    els.testCanvas.style.display = "";
+    T.angle = -Math.PI/2;
+    drawDial();
+  } else if(q.kind === "compare"){
+    els.tKind.textContent = "Distance";
+    els.tQuestion.textContent = "Which is nearer to " + city.landmarks[q.anchor].name + "?";
+    els.tHint.textContent = "As the crow flies.";
+    els.testCanvas.style.display = "none";
+    els.tSubmit.style.display = "none";
+    [q.a, q.b].forEach(function(opt){
+      var b = document.createElement("button");
+      b.textContent = city.landmarks[opt].name;
+      b.addEventListener("click", function(){ scoreQuestion(opt); });
+      els.tChoices.appendChild(b);
+    });
+  } else {
+    els.tKind.textContent = "Drawing the map";
+    els.tQuestion.textContent = "Place these landmarks where you think they are.";
+    els.tHint.textContent = "Drag each name onto the square. North is up. Only how they sit relative to each other is scored, not exact position.";
+    els.testCanvas.style.display = "";
+    T.placed = {};
+    drawBoard();
+  }
+}
+
+function canvasMetrics(){
+  return {w: els.testCanvas.width, h: els.testCanvas.height};
+}
+/* the placement board needs a taller canvas so the name tray has room */
+function sizeCanvasFor(kind){
+  var w = 600, h = (kind === "place") ? 790 : 600;
+  if(els.testCanvas.width !== w) els.testCanvas.width = w;
+  if(els.testCanvas.height !== h) els.testCanvas.height = h;
+}
+
+function drawDial(){
+  var m = canvasMetrics(), w=m.w, h=m.h;
+  var C = {board:css("--board"), ink:css("--ink"), rule:css("--rule"), amber:css("--amber"), faint:css("--ink-faint")};
+  tctx.setTransform(1,0,0,1,0,0);
+  tctx.fillStyle = C.board; tctx.fillRect(0,0,w,h);
+  var cx=w/2, cy=h/2, R=Math.min(w,h)*0.38;
+
+  tctx.strokeStyle = C.rule; tctx.lineWidth = 3;
+  tctx.beginPath(); tctx.arc(cx,cy,R,0,Math.PI*2); tctx.stroke();
+
+  tctx.fillStyle = C.faint;
+  tctx.font = "600 28px 'Helvetica Neue',Helvetica,Arial,sans-serif";
+  tctx.textAlign="center"; tctx.textBaseline="middle";
+  tctx.fillText("N", cx, cy-R-30);
+  tctx.fillText("S", cx, cy+R+30);
+  tctx.fillText("W", cx-R-30, cy);
+  tctx.fillText("E", cx+R+30, cy);
+
+  // tick marks
+  tctx.strokeStyle = C.rule; tctx.lineWidth = 2;
+  for(var a=0;a<360;a+=15){
+    var r1 = (a%45===0) ? R-18 : R-9;
+    var rad = a*Math.PI/180;
+    tctx.beginPath();
+    tctx.moveTo(cx+Math.cos(rad)*r1, cy+Math.sin(rad)*r1);
+    tctx.lineTo(cx+Math.cos(rad)*R, cy+Math.sin(rad)*R);
+    tctx.stroke();
+  }
+
+  // needle
+  var ex = cx+Math.cos(T.angle)*R, ey = cy+Math.sin(T.angle)*R;
+  tctx.strokeStyle = C.amber; tctx.lineWidth = 8; tctx.lineCap="round";
+  tctx.beginPath(); tctx.moveTo(cx,cy); tctx.lineTo(ex,ey); tctx.stroke();
+  tctx.fillStyle = C.amber;
+  tctx.beginPath(); tctx.arc(ex,ey,17,0,Math.PI*2); tctx.fill();
+  tctx.beginPath(); tctx.arc(cx,cy,11,0,Math.PI*2); tctx.fill();
+
+}
+
+function drawBoard(){
+  var q = T.qs[T.i];
+  var m = canvasMetrics(), w=m.w, h=m.h;
+  var C = {board:css("--board"), ink:css("--ink"), rule:css("--rule"), faint:css("--ink-faint"), paper:css("--paper")};
+  tctx.setTransform(1,0,0,1,0,0);
+  tctx.fillStyle = C.board; tctx.fillRect(0,0,w,h);
+
+  var B = boardRect();
+  tctx.strokeStyle = C.rule; tctx.lineWidth = 3;
+  tctx.strokeRect(B.x, B.y, B.s, B.s);
+  tctx.setLineDash([6,10]); tctx.lineWidth = 1.5;
+  for(var i=1;i<4;i++){
+    tctx.beginPath(); tctx.moveTo(B.x+B.s*i/4, B.y); tctx.lineTo(B.x+B.s*i/4, B.y+B.s); tctx.stroke();
+    tctx.beginPath(); tctx.moveTo(B.x, B.y+B.s*i/4); tctx.lineTo(B.x+B.s, B.y+B.s*i/4); tctx.stroke();
+  }
+  tctx.setLineDash([]);
+  tctx.fillStyle = C.faint;
+  tctx.font = "600 22px 'Helvetica Neue',Helvetica,Arial,sans-serif";
+  tctx.textAlign="center"; tctx.textBaseline="middle";
+  tctx.fillText("N", B.x+B.s/2, B.y-18);
+
+  // unplaced names first, so a chip being dragged sits on top
+  q.items.forEach(function(idx, n){
+    if(T.placed[idx]) return;
+    drawChip(trayPoint(n).x, trayPoint(n).y, city.landmarks[idx], false);
+  });
+  q.items.forEach(function(idx){
+    if(!T.placed[idx]) return;
+    drawChip(T.placed[idx].x, T.placed[idx].y, city.landmarks[idx], true);
+  });
+}
+
+var CHIP_FONT = "700 21px 'Helvetica Neue',Helvetica,Arial,sans-serif";
+var CHIP_H = 32;
+
+function boardRect(){
+  var s = 510;
+  return {x:(600 - s)/2, y:34, s:s};
+}
+/* one name per row, so long names never collide */
+function trayPoint(n){
+  var B = boardRect();
+  return {x: 300, y: B.y + B.s + 42 + n*34};
+}
+function chipSize(lm){
+  tctx.font = CHIP_FONT;
+  return {w: tctx.measureText(lm.name).width + 46, h: CHIP_H};
+}
+function drawChip(x, y, lm, placed){
+  var C = {ink:css("--ink"), surf:css("--surface")};
+  var sz = chipSize(lm), wid = sz.w, hgt = sz.h, pad = 13;
+  tctx.font = CHIP_FONT;
+  tctx.globalAlpha = placed ? 1 : 0.9;
+  tctx.fillStyle = C.surf;
+  tctx.strokeStyle = lm.color; tctx.lineWidth = 2.5;
+  roundRect(x-wid/2, y-hgt/2, wid, hgt, 5);
+  tctx.fill(); tctx.stroke();
+  tctx.fillStyle = lm.color;
+  tctx.beginPath(); tctx.arc(x-wid/2+pad+1, y, 6, 0, Math.PI*2); tctx.fill();
+  tctx.fillStyle = C.ink;
+  tctx.textAlign="left"; tctx.textBaseline="middle";
+  tctx.fillText(lm.name, x-wid/2+pad+14, y);
+  tctx.globalAlpha = 1;
+  tctx.textAlign="center";
+}
+function roundRect(x,y,w,h,r){
+  tctx.beginPath();
+  tctx.moveTo(x+r,y); tctx.lineTo(x+w-r,y); tctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  tctx.lineTo(x+w,y+h-r); tctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  tctx.lineTo(x+r,y+h); tctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  tctx.lineTo(x,y+r); tctx.quadraticCurveTo(x,y,x+r,y);
+  tctx.closePath();
+}
+
+/* pointer handling on the test canvas */
+function canvasPoint(ev){
+  var r = els.testCanvas.getBoundingClientRect();
+  return {
+    x: (ev.clientX - r.left) * (els.testCanvas.width / r.width),
+    y: (ev.clientY - r.top)  * (els.testCanvas.height / r.height)
+  };
+}
+els.testCanvas.addEventListener("pointerdown", function(ev){
+  if(!T) return;
+  ev.preventDefault();
+  els.testCanvas.setPointerCapture(ev.pointerId);
+  var q = T.qs[T.i], p = canvasPoint(ev);
+  if(q.kind === "point"){
+    var m = canvasMetrics();
+    T.angle = Math.atan2(p.y - m.h/2, p.x - m.w/2);
+    T.dragging = true;
+    drawDial();
+  } else if(q.kind === "place"){
+    for(var n=q.items.length-1; n>=0; n--){
+      var idx = q.items[n];
+      var cp = T.placed[idx] || trayPoint(n);
+      var sz = chipSize(city.landmarks[idx]);
+      if(Math.abs(p.x-cp.x) < sz.w/2 + 6 && Math.abs(p.y-cp.y) < sz.h/2 + 3){
+        T.drag = {idx:idx, n:n};
+        T.placed[idx] = {x:p.x, y:p.y};
+        drawBoard();
+        return;
+      }
+    }
+  }
+});
+els.testCanvas.addEventListener("pointermove", function(ev){
+  if(!T) return;
+  var q = T.qs[T.i], p = canvasPoint(ev);
+  if(q.kind === "point" && T.dragging){
+    var m = canvasMetrics();
+    T.angle = Math.atan2(p.y - m.h/2, p.x - m.w/2);
+    drawDial();
+  } else if(q.kind === "place" && T.drag){
+    T.placed[T.drag.idx] = {x:p.x, y:p.y};
+    drawBoard();
+  }
+});
+function endDrag(){
+  if(!T) return;
+  T.dragging = false; T.drag = null;
+}
+els.testCanvas.addEventListener("pointerup", endDrag);
+els.testCanvas.addEventListener("pointercancel", endDrag);
+
+/* scoring */
+function worldBearing(fromIdx, toIdx){
+  var a = city.nodes[city.landmarks[fromIdx].node];
+  var b = city.nodes[city.landmarks[toIdx].node];
+  return Math.atan2(b.y-a.y, b.x-a.x);   // screen convention: +y is south
+}
+function angleDiff(a,b){
+  var d = Math.abs(a-b) % (Math.PI*2);
+  return d > Math.PI ? Math.PI*2 - d : d;
+}
+
+function scoreQuestion(choice){
+  var q = T.qs[T.i], sc = 0, detail = "";
+
+  if(q.kind === "point"){
+    var truth = worldBearing(q.from, q.target);
+    var errDeg = angleDiff(T.angle, truth) * 180/Math.PI;
+    sc = Math.max(0, 1 - errDeg/90);
+    detail = Math.round(errDeg) + "° off";
+  } else if(q.kind === "compare"){
+    var A = city.nodes[city.landmarks[q.a].node];
+    var Bn = city.nodes[city.landmarks[q.b].node];
+    var anchor = city.nodes[city.landmarks[q.anchor].node];
+    var dA = Math.hypot(A.x-anchor.x, A.y-anchor.y);
+    var dB = Math.hypot(Bn.x-anchor.x, Bn.y-anchor.y);
+    var right = dA < dB ? q.a : q.b;
+    sc = (choice === right) ? 1 : 0;
+    detail = sc ? "Correct" : "Not quite";
+  } else {
+    var items = q.items.filter(function(i){ return T.placed[i]; });
+    if(items.length < 3){ toast("Place at least three", "Drag them onto the square", 1600); return; }
+    var truthPts = items.map(function(i){ var n=city.nodes[city.landmarks[i].node]; return {x:n.x,y:n.y}; });
+    var guessPts = items.map(function(i){ return {x:T.placed[i].x, y:T.placed[i].y}; });
+    var rmse = configError(truthPts, guessPts);
+    sc = Math.max(0, 1 - rmse/0.75);
+    detail = "Layout " + Math.round(sc*100) + "% right";
+  }
+
+  T.scores.push(sc);
+  toast(Math.round(sc*100) + "%", detail, 1200);
+  T.i += 1;
+  if(T.i >= T.qs.length) setTimeout(finishTest, 900);
+  else setTimeout(renderQuestion, 900);
+}
+
+/* normalise both point sets (translate + scale) then compare */
+function configError(A, B){
+  function norm(pts){
+    var cx=0, cy=0, i;
+    for(i=0;i<pts.length;i++){ cx+=pts[i].x; cy+=pts[i].y; }
+    cx/=pts.length; cy/=pts.length;
+    var rms=0;
+    for(i=0;i<pts.length;i++){ rms += (pts[i].x-cx)*(pts[i].x-cx) + (pts[i].y-cy)*(pts[i].y-cy); }
+    rms = Math.sqrt(rms/pts.length) || 1;
+    return pts.map(function(p){ return {x:(p.x-cx)/rms, y:(p.y-cy)/rms}; });
+  }
+  var na = norm(A), nb = norm(B), s = 0;
+  for(var i=0;i<na.length;i++){
+    var dx = na[i].x-nb[i].x, dy = na[i].y-nb[i].y;
+    s += dx*dx + dy*dy;
+  }
+  return Math.sqrt(s/na.length);
+}
+
+function finishTest(){
+  var total = 0;
+  for(var i=0;i<T.scores.length;i++) total += T.scores[i];
+  var pct = Math.round(100*total/Math.max(1,T.scores.length));
+  var earned = Math.round(pct*2.2);
+
+  save.rating += earned;
+  save.tests += 1;
+  save.testSum += pct;
+  if(pct > save.testBest) save.testBest = pct;
+
+  els.tResScore.textContent = pct + "%";
+  els.tResRating.textContent = "+" + earned;
+  els.tResBest.textContent = save.testBest + "%";
+  els.tResTitle.textContent = T.booster ? "Refresher on " + city.name : "Knowledge Test";
+
+  var note;
+  if(pct >= 85) note = "That's a real map in your head, not a set of remembered turns. This is the thing the game is actually trying to build.";
+  else if(pct >= 60) note = "Solid. The gaps tend to be landmarks you've only approached from one direction — try reaching them a different way.";
+  else if(pct >= 35) note = "Early days. Knowing the route between two places is not the same as knowing where they sit, and the second one is the part worth having.";
+  else note = "Rough — which is normal at first, and honestly the point. If this were easy it wouldn't be doing anything.";
+  if(T.booster) note += " Refreshers on cities you've left are the part of this with the strongest evidence behind it.";
+  els.tResNote.textContent = note;
+
+  els.tBar.style.width = "100%";
+  els.tBody.style.display = "none";
+  els.tResult.style.display = "";
+
+  if(T.booster) completeBooster(pct);
+  persist(); syncHud();
+}
+
+/* ============================================================
+   UI plumbing
+   ============================================================ */
+var toastTimer = null;
+function toast(big, small, ms){
+  els.toast.querySelector(".big").innerHTML = big;
+  els.toast.querySelector(".small").innerHTML = small || "";
+  els.toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ els.toast.classList.remove("show"); }, ms||1600);
+}
+
+var PANELS = ["panelTitle","panelWhy","panelKnowledge","panelMenu","panelShift","panelTest"];
+function openPanel(p){
+  PANELS.forEach(function(id){ els[id].classList.remove("open"); });
+  if(p){ p.classList.add("open"); p.scrollTop = 0; G.running = false; }
+  else { G.running = true; }
+}
+function closePanels(){
+  openPanel(null);
+  els.probe.classList.remove("open");
+  if(G.hail && G.hail.phase === "ask") G.hail = null;
+}
+
+function syncHud(){
+  if(city){
+    els.hCity.textContent = city.name;
+    els.hShift.textContent = save.shiftNo + " · " + save.fareInShift + "/5";
+  }
+  els.hRating.textContent = save.rating;
+  els.mRating.textContent = save.rating;
+  els.mLevel.textContent = level();
+  els.mFares.textContent = save.fares;
+  els.mEff.textContent = save.fares ? Math.round((save.effSum/save.fares)*100) + "%" : "—";
+  els.diffSub.textContent = PRESETS[save.preset].name;
+  els.rotSub.textContent = rotateAllowed()
+    ? (save.rotate ? "On — the view turns with the cab" : "Off — north stays up")
+    : "Unlocks at Level 4 (rating 1500)";
+  els.btnRotate.disabled = !rotateAllowed();
+  els.ufovSub.textContent = save.ufovOn
+    ? ("On — flashing for " + save.ufovMs + "ms" + (save.ufovTrials ? " · " + Math.round(100*save.ufovHits/save.ufovTrials) + "% spotted" : ""))
+    : "Off";
+  els.testSub.textContent = save.tests
+    ? ("Taken " + save.tests + " · best " + save.testBest + "%")
+    : "Point, place and compare — measures the map in your head";
+  document.body.classList.toggle("scale-lg", !!PRESETS[save.preset].bigText);
+
+  var due = dueBooster(), nxt = nextBooster();
+  if(due){
+    els.btnBooster.style.display = "";
+    els.btnBooster.classList.add("amber"); els.btnBooster.classList.remove("ghost");
+    els.boosterLabel.textContent = "Refresher due: " + due.name;
+    els.boosterSub.textContent = "A city you learned earlier. On the evidence, this is the part that counts.";
+    els.btnBooster.__entry = due;
+  } else if(nxt){
+    els.btnBooster.style.display = "";
+    els.btnBooster.classList.remove("amber"); els.btnBooster.classList.add("ghost");
+    els.boosterLabel.textContent = "Refresher: " + nxt.name;
+    els.boosterSub.textContent = "Filed, " + humanDue(nxt) + ". You can take it early if you like.";
+    els.btnBooster.__entry = nxt;
+  } else {
+    els.btnBooster.style.display = "none";
+    els.btnBooster.__entry = null;
+  }
+}
+
+function renderPresets(){
+  els.presetList.innerHTML = "";
+  PRESET_ORDER.forEach(function(key){
+    var P = PRESETS[key];
+    var b = document.createElement("button");
+    b.className = "preset" + (save.preset===key ? " sel" : "");
+    b.innerHTML = '<span class="n">' + P.name + '</span><span class="d">' + P.desc + '</span>';
+    b.addEventListener("click", function(){
+      save.preset = key; renderPresets(); syncHud();
+      els.startSub.textContent = "New city · " + P.name;
+      persist();
+    });
+    els.presetList.appendChild(b);
+  });
+  els.startSub.textContent = (save.seed ? "Continue · " : "New city · ") + PRESETS[save.preset].name;
+}
+
+function renderKnowledge(){
+  els.kTitle.textContent = city.name;
+  els.kStreets.textContent = streetsPct() + "%";
+  els.kFound.textContent = city.found.length + "/" + city.landmarks.length;
+  els.kBest.textContent = save.bestEff ? save.bestEff + "%" : "—";
+  els.kTest.textContent = save.testBest ? save.testBest + "%" : "—";
+  els.kList.innerHTML = "";
+  if(!city.found.length){
+    var li0 = document.createElement("li");
+    li0.textContent = "Nothing yet. Drive.";
+    els.kList.appendChild(li0);
+  }
+  city.found.forEach(function(i){
+    var lm = city.landmarks[i];
+    var li = document.createElement("li");
+    li.innerHTML = '<span class="dot" style="background:' + lm.color + '"></span>' + lm.name;
+    els.kList.appendChild(li);
+  });
+}
+
+/* ============================================================
+   City lifecycle
+   ============================================================ */
+function startCity(seed, restore, presetOverride){
+  var useP = presetOverride || (restore ? (save.cityPreset || save.preset) : save.preset);
+  save.seed = seed;
+  save.cityPreset = useP;
+  city = buildCity(seed, useP);
+
+  if(restore && save.explored && save.explored.length){
+    save.explored.forEach(function(k){
+      city.explored[k] = true; city.seen[k] = true;
+      var parts = k.split("_");
+      if(parts.length !== 2) return;
+      [parseInt(parts[0],10), parseInt(parts[1],10)].forEach(function(nid){
+        if(!city.nodes[nid]) return;
+        city.seen["n"+nid] = true; city.visited["n"+nid] = true;
+        city.nodes[nid].edges.forEach(function(nb){
+          city.seen[edgeKey(nid,nb)] = true; city.seen["n"+nb] = true;
+        });
+      });
+    });
+    city.found = (save.found||[]).filter(function(f){ return f < city.landmarks.length; });
+  } else {
+    save.explored = []; save.found = [];
+    save.shiftNo = 1; save.fareInShift = 0;
+  }
+
+  var mid = Math.floor(city.nodes.length/2);
+  G.at = mid; G.from = -1; G.to = -1; G.t = 0; G.heading = 0;
+  G.travelled = 0; G.fare = null; G.queued = null; G.hail = null;
+  G.sinceHail = 0; G.nextHail = 700;
+  var n0 = city.nodes[mid];
+  G.camX = n0.x; G.camY = n0.y;
+
+  revealAround(G.at);
+  updateFareBanner();
+  checkFare();
+  syncHud();
+  persist();
+}
+
+function newCity(){
+  archiveCurrent();
+  save.explored = []; save.found = [];
+  save.shiftNo = 1; save.fareInShift = 0;
+  G.boosterOf = null;
+  startCity((Math.random()*2147483647)|0, false);
+  closePanels();
+  toast("Welcome to " + city.name, "A city you have never seen before", 2200);
+}
+
+/* ============================================================
+   Input
+   ============================================================ */
+var held = {};
+var KEYMAP = {ArrowUp:"up", ArrowDown:"down", ArrowLeft:"left", ArrowRight:"right",
+              w:"up", s:"down", a:"left", d:"right", W:"up", S:"down", A:"left", D:"right"};
+
+document.addEventListener("keydown", function(ev){
+  if(ev.key === "Escape"){ closePanels(); return; }
+  var d = KEYMAP[ev.key];
+  if(!d) return;
+  ev.preventDefault();
+  if(!held[d]){ held[d] = true; tryMove(d); }
+  flashPad(d, true);
+});
+document.addEventListener("keyup", function(ev){
+  var d = KEYMAP[ev.key];
+  if(d){ held[d] = false; flashPad(d,false); }
+});
+function flashPad(d,on){
+  var b = els.dpad.querySelector('[data-dir="'+d+'"]');
+  if(b) b.classList.toggle("on", !!on);
+}
+Array.prototype.forEach.call(els.dpad.querySelectorAll("[data-dir]"), function(b){
+  var d = b.getAttribute("data-dir");
+  b.addEventListener("pointerdown", function(ev){ ev.preventDefault(); held[d]=true; b.classList.add("on"); tryMove(d); });
+  ["pointerup","pointercancel","pointerleave"].forEach(function(evt){
+    b.addEventListener(evt, function(ev){ ev.preventDefault(); held[d]=false; b.classList.remove("on"); });
+  });
+});
+function autoDrive(){
+  if(G.running && G.from < 0){
+    for(var d in held){ if(held[d]){ tryMove(d); break; } }
+  }
+}
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+els.btnStart.addEventListener("click", function(){
+  if(save.seed){ startCity(save.seed, true); closePanels(); }
+  else newCity();
+  persist();
+});
+els.btnWhy.addEventListener("click", function(){ openPanel(els.panelWhy); });
+els.btnWhy2.addEventListener("click", function(){ openPanel(els.panelWhy); });
+els.btnKnowledge.addEventListener("click", function(){ renderKnowledge(); openPanel(els.panelKnowledge); });
+els.btnMenu.addEventListener("click", function(){ syncHud(); openPanel(els.panelMenu); });
+els.btnNewCity.addEventListener("click", newCity);
+els.btnNewCity2.addEventListener("click", newCity);
+els.btnNextShift.addEventListener("click", function(){ closePanels(); newFare(); syncHud(); });
+els.btnTest.addEventListener("click", function(){ startTest(false); });
+els.btnTestFromShift.addEventListener("click", function(){ startTest(false); });
+els.btnBooster.addEventListener("click", function(){
+  var e = els.btnBooster.__entry;
+  if(e) startBooster(e);
+});
+els.btnRotate.addEventListener("click", function(){
+  if(!rotateAllowed()) return;
+  save.rotate = !save.rotate; persist(); syncHud();
+  toast(save.rotate ? "Rotating view on" : "North-up view",
+        save.rotate ? "Up is now wherever the cab is pointing" : "North stays at the top", 1600);
+});
+els.btnUfov.addEventListener("click", function(){
+  save.ufovOn = !save.ufovOn;
+  if(!save.ufovOn){ G.hail = null; els.probe.classList.remove("open"); }
+  persist(); syncHud();
+});
+els.btnDiff.addEventListener("click", function(){ renderPresets(); openPanel(els.panelTitle); });
+els.btnWipe.addEventListener("click", function(){
+  if(!confirm("Erase rating, progress, filed cities and this city? This cannot be undone.")) return;
+  try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+  location.reload();
+});
+els.tSubmit.addEventListener("click", function(){ scoreQuestion(null); });
+els.tQuit.addEventListener("click", function(){ T = null; closePanels(); });
+els.tResDone.addEventListener("click", function(){ T = null; closePanels(); syncHud(); });
+Array.prototype.forEach.call(document.querySelectorAll("[data-close]"), function(b){
+  b.addEventListener("click", closePanels);
+});
+
+/* ============================================================
+   Loop
+   ============================================================ */
+function frame(ts){
+  var dt = G.lastTs ? Math.min((ts-G.lastTs)/1000, 0.05) : 0;
+  G.lastTs = ts;
+  if(G.running){ step(dt); autoDrive(); }
+  draw();
+  requestAnimationFrame(frame);
+}
+
+/* ============================================================
+   Boot
+   ============================================================ */
+/* Test seam. Only attached with #debug in the URL — it exposes the city graph,
+   which would obviously ruin the game if it were on by default. */
+if(location.hash === "#debug"){
+  window.__knowledge = {
+    city:function(){ return city; },
+    state:function(){ return G; },
+    save:function(){ return save; },
+    test:function(){ return T; },
+    distancesFrom:distancesFrom,
+    edgeKey:edgeKey,
+    startTest:startTest,
+    forceHail:function(){ G.sinceHail = 1e9; }
+  };
+}
+
+load();
+if(!Array.isArray(save.archive)) save.archive = [];
+if(!PRESETS[save.preset]) save.preset = "cabbie";
+if(!PRESETS[save.cityPreset]) save.cityPreset = save.preset;
+resize();
+renderPresets();
+startCity(save.seed || ((Math.random()*2147483647)|0), !!save.seed);
+G.running = false;
+openPanel(els.panelTitle);
+syncHud();
+requestAnimationFrame(frame);
+
+})();
+</script>
+</body>
+</html>
