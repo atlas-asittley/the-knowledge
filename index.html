@@ -1549,10 +1549,29 @@ function toast(big, small, ms){
 }
 
 var PANELS = ["panelTitle","panelWhy","panelKnowledge","panelMenu","panelShift","panelTest"];
+function currentPanel(){
+  for(var i=0;i<PANELS.length;i++){
+    if(els[PANELS[i]].classList.contains("open")) return els[PANELS[i]];
+  }
+  return null;
+}
 function openPanel(p){
   PANELS.forEach(function(id){ els[id].classList.remove("open"); });
   if(p){ p.classList.add("open"); p.scrollTop = 0; G.running = false; }
   else { G.running = true; }
+}
+/* open a panel remembering where we came from, so "Back" goes back there
+   rather than dumping the player into the game */
+function openOver(p){
+  var from = currentPanel();
+  openPanel(p);
+  p.__back = (from && from !== p) ? from : null;
+}
+function goBack(panel){
+  var back = panel && panel.__back;
+  if(panel) panel.__back = null;
+  if(back) openPanel(back);
+  else closePanels();
 }
 function closePanels(){
   openPanel(null);
@@ -1699,7 +1718,12 @@ var KEYMAP = {ArrowUp:"up", ArrowDown:"down", ArrowLeft:"left", ArrowRight:"righ
               w:"up", s:"down", a:"left", d:"right", W:"up", S:"down", A:"left", D:"right"};
 
 document.addEventListener("keydown", function(ev){
-  if(ev.key === "Escape"){ closePanels(); return; }
+  if(ev.key === "Escape"){
+    var cp = currentPanel();
+    if(cp === els.panelTitle) return;        // the title screen is not dismissable
+    if(cp) goBack(cp); else closePanels();
+    return;
+  }
   var d = KEYMAP[ev.key];
   if(!d) return;
   ev.preventDefault();
@@ -1735,9 +1759,9 @@ els.btnStart.addEventListener("click", function(){
   else newCity();
   persist();
 });
-els.btnWhy.addEventListener("click", function(){ openPanel(els.panelWhy); });
-els.btnWhy2.addEventListener("click", function(){ openPanel(els.panelWhy); });
-els.btnKnowledge.addEventListener("click", function(){ renderKnowledge(); openPanel(els.panelKnowledge); });
+els.btnWhy.addEventListener("click", function(){ openOver(els.panelWhy); });
+els.btnWhy2.addEventListener("click", function(){ openOver(els.panelWhy); });
+els.btnKnowledge.addEventListener("click", function(){ renderKnowledge(); openOver(els.panelKnowledge); });
 els.btnMenu.addEventListener("click", function(){ syncHud(); openPanel(els.panelMenu); });
 els.btnNewCity.addEventListener("click", newCity);
 els.btnNewCity2.addEventListener("click", newCity);
@@ -1769,7 +1793,7 @@ els.tSubmit.addEventListener("click", function(){ scoreQuestion(null); });
 els.tQuit.addEventListener("click", function(){ T = null; closePanels(); });
 els.tResDone.addEventListener("click", function(){ T = null; closePanels(); syncHud(); });
 Array.prototype.forEach.call(document.querySelectorAll("[data-close]"), function(b){
-  b.addEventListener("click", closePanels);
+  b.addEventListener("click", function(){ goBack(b.closest(".panel")); });
 });
 
 /* ============================================================
